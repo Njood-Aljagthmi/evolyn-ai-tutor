@@ -1,0 +1,133 @@
+:root {
+  --font-sans: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Outfit', ui-monospace, monospace;
+  
+  /* Evolyn Color Palette Integration */
+  --bg-gradient: radial-gradient(circle at top left, #1c252d 0%, #0e1219 60%, #08090d 100%);
+  --text-primary: #E5F0FF;
+  --text-secondary: #99C7D5;
+  --text-muted: #676F82;
+  --border-glow: rgba(125, 130, 176, 0.15);
+  
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background: var(--bg-gradient);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Premium ambient drifting background blobs */
+.bg-blob {
+  position: fixed;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  filter: blur(150px);
+  opacity: 0.12;
+  z-index: -1;
+  pointer-events: none;
+  animation: drift 25s infinite alternate ease-in-out;
+}
+
+.bg-blob-1 {
+  background: #7D82B0; /* Slate/Purple */
+  top: -200px;
+  left: -200px;
+}
+
+.bg-blob-2 {
+  background: #557F8C; /* Teal/Cyan */
+  bottom: -200px;
+  right: -200px;
+  animation-delay: -8s;
+}
+
+@keyframes drift {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    transform: translate(100px, 80px) scale(1.2);
+  }
+}
+
+/* Glass cards keep light text by default */
+.glass-card, .glass-card h1, .glass-card h2, .glass-card h3, .glass-card h4, .glass-card p, .glass-card span, .glass-card li, .glass-card strong, .glass-card td, .glass-card th {
+  color: #E5F0FF;
+}
+
+.subject-card, .subject-card h3, .subject-card p {
+  color: #E5F0FF;
+}
+
+/* Modal text styling overrides to stay light inside modal */
+.modal-overlay, .modal-card, .modal-card h2, .modal-card p, .modal-card span {
+  color: #E5F0FF !important;
+}
+
+/* White Login Card styling to match logo background */
+.login-card {
+  background: #ffffff !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+}
+
+.login-card,
+.login-card h1,
+.login-card p,
+.login-card .logo-section p,
+.login-card .login-description {
+  color: #0f172a !important; /* dark slate */
+}
+
+.login-card .login-description {
+  color: #557F8C !important;
+}
+
+.login-card .login-divider {
+  background: rgba(0, 0, 0, 0.1) !important;
+}
+
+.login-card .login-btn {
+  background: #0f172a !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+}
+
+.login-card .login-btn span {
+  color: #ffffff !important;
+}
+
+.login-card .login-btn:hover {
+  background: #1e293b !important;
+  box-shadow: 0 6px 15px rgba(15, 23, 42, 0.25) !important;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+/* Scrollbar customization for premium styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #090d16;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
