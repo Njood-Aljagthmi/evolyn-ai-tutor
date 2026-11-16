@@ -1,0 +1,201 @@
+"""
+job_recommender.py — AI-powered career recommendations based on learner journey.
+Uses GPT-4o-mini to generate tailored job suggestions + an Evolyn Endorsement Card.
+"""
+
+import sys
+import json
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.append(str(ROOT))
+sys.path.append(str(ROOT / "database"))
+
+from db import get_connection
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import HumanMessage, SystemMessage
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Data Gathering
+# ─────────────────────────────────────────────────────────────────────────────
+
+def gather_learner_profile(learner_id: str) -> dict:
+    """Collects all relevant learner data from DB for career analysis."""
+    conn = get_connection()
+    cur = conn.cursor()
+
+    # Basic profile
+    cur.execute(
+        "SELECT name, email, goal, skill_level FROM learner_profile WHERE learner_id = ?",
+        (learner_id,),
+    )
+    row = cur.fetchone()
+    if not row:
+        conn.close()
+        return {}
+
+    name, email, goal, skill_level = row
+
+    # Active subject from learning_plan
+    cur.execute(
+        "SELECT subject, current_level FROM learning_plan WHERE learner_id = ? ORDER BY id DESC LIMIT 1",
+        (learner_id,),
+    )
+    plan_row = cur.fetchone()
+    subject = plan_row[0] if plan_row else "python"
+    current_level = plan_row[1] if plan_row else skill_level
+
+    # Completed topics
+    cur.execute(
+        "SELECT topic, level FROM topic_summary WHERE learner_id = ? AND status = 'done'",
+        (learner_id,),
+    )
+    completed_topics = [{"topic": r[0], "level": r[1]} for r in cur.fetchall()]
+
+    # Quiz average
+    cur.execute(
+        "SELECT AVG(score) FROM quiz_attempts WHERE learner_id = ?", (learner_id,)
+    )
+    avg_row = cur.fetchone()
+    quiz_average = round(avg_row[0], 1) if avg_row and avg_row[0] else 0
+
+    # Weak areas
+    cur.execute(
+        "SELECT DISTINCT topic FROM weak_areas WHERE learner_id = ?", (learner_id,)
+    )
+    weak_areas = [r[0] for r in cur.fetchall()]
+
+    # Earned badges
+    cur.execute(
+        "SELECT badge_id FROM learner_badges WHERE learner_id = ?", (learner_id,)
+    )
+    badges = [r[0] for r in cur.fetchall()]
+
+    # GitHub connected?
+    cur.execute(
+        "SELECT github_username FROM github_connections WHERE learner_id = ?",
+        (learner_id,),
+    )
+    gh_row = cur.fetchone()
+    github_username = gh_row[0] if gh_row else None
+
+    conn.close()
+
+    return {
+        "name": name,
+        "email": email,
+        "goal": goal,
+        "skill_level": skill_level,
+        "subject": subject,
+        "current_level": current_level,
+        "completed_topics": completed_topics,
+        "quiz_average": quiz_average,
+        "weak_areas": weak_areas,
+        "badges": badges,
+        "github_username": github_username,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AI Recommendation Engine
+# ─────────────────────────────────────────────────────────────────────────────
+
+def generate_career_recommendations(learner_id: str) -> dict:
+    """
+    Uses GPT-4o-mini to generate job recommendations and an Evolyn Endorsement Card
+    based on the learner's full profile.
+    """
+    profile = gather_learner_profile(learner_id)
+    if not profile:
+        return {"error": "Learner not found"}
+
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.4)
+
+    system_prompt = """You are Evolyn's AI Career Advisor. Your job is to analyze a learner's 
+programming learning journey and generate:
+1. 3 to 5 tailored job/internship recommendations
+2. A skills summary
+3. A professional Evolyn AI Endorsement Card in GitHub Markdown format
+
+ALWAYS respond with valid JSON in this exact structure:
+{
+  "recommendations": [
+    {
+      "title": "Job Title",
+      "level": "Entry/Junior/Mid",
+      "match_score": 85,
+      "description": "Brief 1-2 sentence description of the role",
+      "required_skills": ["skill1", "skill2"],
+      "matched_skills": ["skill1"],
+      "missing_skills": ["skill2"],
+      "companies": ["Company A", "Company B"],
+      "tip": "One actionable tip to increase your chances"
+    }
+  ],
+  "skills_summary": {
+    "strengths": ["List of strong areas"],
+    "areas_to_improve": ["List of weak areas"],
+    "overall_readiness": "A 1-sentence honest career readiness assessment"
+  },
+  "endorsement_card_markdown": "The full GitHub README markdown badge card"
+}
+
+For the endorsement_card_markdown, create a beautiful Markdown card like this:
+```
+## 🎓 Evolyn AI Endorsement
+
+| | |
+|---|---|
+| **Learner** | {name} |
+| **Platform** | [Evolyn Learning](https://evolyn.ai) |
+| **Subject** | {subject} |
+| **Level Achieved** | {level} |
+| **Quiz Average** | {avg}% |
+| **Badges Earned** | {badge_count} |
+| **Verified** | ✅ AI-Verified by Evolyn |
+
+> *This endorsement was generated by Evolyn's AI Tutor agent based on verified learning data.*
+```
+"""
+
+    user_prompt = f"""
+Learner Profile:
+- Name: {profile['name']}
+- Goal: {profile['goal']}
+- Subject: {profile['subject'].upper()}
+- Current Level: {profile['current_level']}
+- Quiz Average: {profile['quiz_average']}%
+- Completed Topics: {[t['topic'] for t in profile['completed_topics']]}
+- Weak Areas: {profile['weak_areas']}
+- Earned Badges: {profile['badges']}
+- GitHub: {'@' + profile['github_username'] if profile['github_username'] else 'Not connected'}
+
+Generate tailored job recommendations and the endorsement card.
+"""
+
+    response = llm.invoke([
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=user_prompt),
+    ])
+
+    content = response.content.strip()
+
+    # Strip markdown code fence if present
+    if content.startswith("```json"):
+        content = content[7:]
+    if content.startswith("```"):
+        content = content[3:]
+    if content.endswith("```"):
+        content = content[:-3]
+
+    result = json.loads(content.strip())
+    result["profile_snapshot"] = {
+        "name": profile["name"],
+        "subject": profile["subject"],
+        "current_level": profile["current_level"],
+        "quiz_average": profile["quiz_average"],
+        "badge_count": len(profile["badges"]),
+        "github_username": profile["github_username"],
+    }
+
+    return result
